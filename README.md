@@ -1,1 +1,2 @@
-An agent service which is run by self-built inference framework.
+# llm-inference-lab
+An agent service running on vLLM deployed on the cloud to test the benchmark with quantified numbers.
