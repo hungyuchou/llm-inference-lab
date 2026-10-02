@@ -74,7 +74,7 @@ def token_calculate_time(text, title):
 
 
     print(f"--- {title} ---")    
-    print(f"Input tokens: {len(tokenizer.encode(text))}")
+    print(f"Input tokens: {tokenizer.encode(text)['input_ids'].shape[1]}")}")
     print(f"TTFT: {ttft_list.sort()[1]} seconds")
     # print(f"Total tokens generated: {token_num}")
     print(f"TPOT: {tpot_list.sort()[1]} seconds per token")
