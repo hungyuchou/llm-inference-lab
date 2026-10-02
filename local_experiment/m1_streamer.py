@@ -38,22 +38,22 @@ Perhaps the most important thing in life is not maintaining the fastest possible
 
 def token_calculate_time(text, title):
 
-    inputs = tokenizer(text, padding=True, padding_side="left", truncation=True, return_tensors="pt")
-    streamer = TextIteratorStreamer(tokenizer, skip_special_tokens=True, skip_prompt=True)
-    generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=100, do_sample=False)
-    thread = Thread(target=model.generate, kwargs=generation_kwargs)
-    
-
-    start = perf_counter()
-    thread.start()
-    generated_text = ""
-
-    has_first_token = False
-
     ttft_list = []
     tpot_list = []
     
     for k in range(3):
+
+        inputs = tokenizer(text, padding=True, padding_side="left", truncation=True, return_tensors="pt")
+        streamer = TextIteratorStreamer(tokenizer, skip_special_tokens=True, skip_prompt=True)
+        generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=100, do_sample=False)
+        thread = Thread(target=model.generate, kwargs=generation_kwargs)
+        
+
+        start = perf_counter()
+        thread.start()
+        generated_text = ""
+
+        has_first_token = False
 
         for new_text in streamer:
 
