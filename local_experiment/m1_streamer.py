@@ -40,7 +40,7 @@ async def token_calculate_time(text, title):
 
     inputs = tokenizer(text, padding=True, padding_side="left", truncation=True, return_tensors="pt")
     streamer = AsyncTextIteratorStreamer(tokenizer, skip_special_tokens=True, skip_prompt=True)
-    generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=100)
+    generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=100, do_sample=False)
     thread = Thread(target=model.generate, kwargs=generation_kwargs)
     
 
@@ -49,7 +49,6 @@ async def token_calculate_time(text, title):
     generated_text = ""
 
     has_first_token = False
-    
 
     async for new_text in streamer:
 
@@ -66,11 +65,16 @@ async def token_calculate_time(text, title):
     token_num = len(tokenizer.encode(generated_text))
 
     print(f"--- {title} ---")    
+    print(f"Input tokens: {len(tokenizer.encode(text))}")
     print(f"TTFT: {first_token_time - start}")
-    print(f"Total words generated: {token_num}")
-    print(f"TPOT: {(end - first_token_time)/token_num} per token")
+    print(f"Total tokens generated: {token_num}")
+    print(f"TPOT: {(end - first_token_time)/(token_num-1)} per token")
 
 
+raw_inputs = ["How are you today?"]
+
+inputs = tokenizer(raw_inputs, padding=True, padding_side="left", truncation=True, return_tensors="pt")
+generated_ids = model.generate(**inputs, max_new_tokens=100, do_sample=False)
 
 asyncio.run(token_calculate_time(short_token_inputs, "Short token input"))
 asyncio.run(token_calculate_time(long_token_inputs, "Long token input"))
