@@ -73,11 +73,12 @@ def token_calculate_time(text, title):
         tpot_list.append((end - first_token_time) / (token_num - 1))
 
 
+
     print(f"--- {title} ---")    
-    print(f"Input tokens: {tokenizer.encode(text)['input_ids'].shape[1])}")
-    print(f"TTFT: {ttft_list.sort()[1]} seconds")
+    print(f"Input tokens: {len(tokenizer(text)['input_ids'][0])}")
+    print(f"TTFT: {sorted(ttft_list)[1]} seconds")
     # print(f"Total tokens generated: {token_num}")
-    print(f"TPOT: {tpot_list.sort()[1]} seconds per token")
+    print(f"TPOT: {sorted(tpot_list)[1]} seconds per token")
 
 
 raw_inputs = ["How are you today?"]
