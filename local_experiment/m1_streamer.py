@@ -1,4 +1,4 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM, AsyncTextIteratorStreamer
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextIteratorStreamer
 from threading import Thread
 from time import perf_counter
 import asyncio
@@ -36,10 +36,10 @@ Perhaps the most important thing in life is not maintaining the fastest possible
 """]
 
 
-async def token_calculate_time(text, title):
+def token_calculate_time(text, title):
 
     inputs = tokenizer(text, padding=True, padding_side="left", truncation=True, return_tensors="pt")
-    streamer = AsyncTextIteratorStreamer(tokenizer, skip_special_tokens=True, skip_prompt=True)
+    streamer = TextIteratorStreamer(tokenizer, skip_special_tokens=True, skip_prompt=True)
     generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=100, do_sample=False)
     thread = Thread(target=model.generate, kwargs=generation_kwargs)
     
@@ -50,25 +50,34 @@ async def token_calculate_time(text, title):
 
     has_first_token = False
 
-    async for new_text in streamer:
+    ttft_list = []
+    tpot_list = []
+    
+    for k in range(3):
 
-        if new_text and not has_first_token:
-            has_first_token = True
-            first_token_time = perf_counter()
+        for new_text in streamer:
 
-        generated_text += new_text
+            if new_text and not has_first_token:
+                has_first_token = True
+                first_token_time = perf_counter()
 
-    end = perf_counter()
+            generated_text += new_text
 
-    print(generated_text)
+        end = perf_counter()
 
-    token_num = len(tokenizer.encode(generated_text))
+        print(generated_text)
+
+        token_num = len(tokenizer.encode(generated_text))
+
+        ttft_list.append(first_token_time - start)
+        tpot_list.append((end - first_token_time) / (token_num - 1))
+
 
     print(f"--- {title} ---")    
     print(f"Input tokens: {len(tokenizer.encode(text))}")
-    print(f"TTFT: {first_token_time - start}")
-    print(f"Total tokens generated: {token_num}")
-    print(f"TPOT: {(end - first_token_time)/(token_num-1)} per token")
+    print(f"TTFT: {ttft_list.sort()[1]} seconds")
+    # print(f"Total tokens generated: {token_num}")
+    print(f"TPOT: {tpot_list.sort()[1]} seconds per token")
 
 
 raw_inputs = ["How are you today?"]
@@ -76,5 +85,5 @@ raw_inputs = ["How are you today?"]
 inputs = tokenizer(raw_inputs, padding=True, padding_side="left", truncation=True, return_tensors="pt")
 generated_ids = model.generate(**inputs, max_new_tokens=100, do_sample=False)
 
-asyncio.run(token_calculate_time(short_token_inputs, "Short token input"))
-asyncio.run(token_calculate_time(long_token_inputs, "Long token input"))
+token_calculate_time(short_token_inputs, "Short token input")
+token_calculate_time(long_token_inputs, "Long token input")
