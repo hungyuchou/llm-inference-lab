@@ -36,16 +36,16 @@ Perhaps the most important thing in life is not maintaining the fastest possible
 """]
 
 
-def token_calculate_time(text, title):
+def token_calculate_time(text, title, cache_flag=True):
 
     ttft_list = []
     tpot_list = []
     
     for k in range(3):
 
-        inputs = tokenizer(text, padding=True, padding_side="left", truncation=True, return_tensors="pt")
         streamer = TextIteratorStreamer(tokenizer, skip_special_tokens=True, skip_prompt=True)
-        generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=100, do_sample=False)
+        inputs = tokenizer(text, padding=True, padding_side="left", truncation=True, return_tensors="pt")
+        generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=200, do_sample=False, use_cache=cache_flag)
         thread = Thread(target=model.generate, kwargs=generation_kwargs)
         
 
@@ -65,7 +65,8 @@ def token_calculate_time(text, title):
 
         end = perf_counter()
 
-        print(generated_text)
+        if not k:
+            print(generated_text)
 
         token_num = len(tokenizer.encode(generated_text))
 
@@ -74,7 +75,7 @@ def token_calculate_time(text, title):
 
 
 
-    print(f"--- {title} ---")    
+    print(f"--- {title} with the cache flag set to {cache_flag} ---")    
     print(f"Input tokens: {len(tokenizer(text)['input_ids'][0])}")
     print(f"TTFT: {sorted(ttft_list)[1]} seconds")
     # print(f"Total tokens generated: {token_num}")
@@ -84,7 +85,10 @@ def token_calculate_time(text, title):
 raw_inputs = ["How are you today?"]
 
 inputs = tokenizer(raw_inputs, padding=True, padding_side="left", truncation=True, return_tensors="pt")
-generated_ids = model.generate(**inputs, max_new_tokens=100, do_sample=False)
+generated_ids = model.generate(**inputs, max_new_tokens=200, do_sample=False)
 
-token_calculate_time(short_token_inputs, "Short token input")
-token_calculate_time(long_token_inputs, "Long token input")
+token_calculate_time(short_token_inputs, "Short token input", cache_flag=True)
+token_calculate_time(short_token_inputs, "Short token input", cache_flag=False)
+
+token_calculate_time(long_token_inputs, "Long token input", cache_flag=True)
+token_calculate_time(long_token_inputs, "Long token input", cache_flag=False)
