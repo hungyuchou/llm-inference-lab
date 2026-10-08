@@ -61,10 +61,11 @@ Configs:
 
 
 ### M1.3 — Disabling KV cache
-（表格：有/沒 cache）
-- 解讀：
+
+- The reason is because of the KV cache - in Qwen2.5-0.5B, 24 (layers) x 2 (K &V) x 2 (KV-head) x 64 (dimensions) x 2 (bytes) = 12KB/token, and the weight is roughly 1GB.
+- In 1,000 token cases -> it will be 12 MB; 100,000 tokens will be 1.2GB, similar to the weights and TPOT turns to be 2x
 
 ### Measurement caveats
-1.
-2.
-3.
+1. The number testing with Mac's CPU can not interpret on GPU's cases, as CPU's capacitiy is 120 GFLOPS where L4 is 121 TFLOPS (1,000x), and the bandwidth is 60 vs 300 GB/s (5x)
+2. `TextIteratorStreamer` will output texts after the word finishes. It will affect short prompt by 20% since TTFT will take 1 more 1 TPOT.
+3. Every function calling (model.generate) is running for three times (using one machine) to take the median.
