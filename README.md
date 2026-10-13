@@ -66,8 +66,86 @@ Setting: Short prompt (11 tokens), 200 new tokens , greedy.
 - TTFT is similar as the first token is only affected by the prefill stage
 - When there is no cache, the model has to calculate (11+t) tokens all over again at step t, hence is 46x slower as the result. 
 
+### M2.1 — GPU sizing (why choosing L4)
+
+Model: `Qwen2.5-7B-Instruct`, bf16. Numbers below are estimates by hand, to be verified in M2.4 / M3.
+
+Model config from the Huggingface
+
+```
+
+{
+  "architectures": [
+    "Qwen2ForCausalLM"
+  ],
+  "attention_dropout": 0.0,
+  "bos_token_id": 151643,
+  "eos_token_id": 151645,
+  "hidden_act": "silu",
+  "hidden_size": 3584,
+  "initializer_range": 0.02,
+  "intermediate_size": 18944,
+  "max_position_embeddings": 32768,
+  "max_window_layers": 28,
+  "model_type": "qwen2",
+  "num_attention_heads": 28,
+  "num_hidden_layers": 28,
+  "num_key_value_heads": 4,
+  "rms_norm_eps": 1e-06,
+  "rope_theta": 1000000.0,
+  "sliding_window": 131072,
+  "tie_word_embeddings": false,
+  "torch_dtype": "bfloat16",
+  "transformers_version": "4.43.1",
+  "use_cache": true,
+  "use_sliding_window": false,
+  "vocab_size": 152064
+}
+
+```
+
+**Memory budget on L4 (24 GB)**
+
+| Item | Size | How I got it |
+|------------|-------|------------|
+| Weights | ~14GB | Number of Parameters (7.61B) × 2 bytes |
+| CUDA context / activations (reserved) | 1GB | Served as a buffer for activation |
+| Left for KV cache | 9 GB | 24 - 14 - 1 |
+
+**KV cache per token**
+
+```
+Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
+```
+
+- The reason for having the 2 in the beginning is to consider K & V at the same time.
+- Using `num_key_value_heads` because the model has GQA, where 28 query heads share 4 K/Vs.
+- `head_dim` is calculated by hidden_size / attention head
+
+**Capacity**
+
+| | Value |
+|------------|-------|
+| Max tokens in KV cache | ~140k |
+| Concurrent 2k-token requests | ~60-68 (Left for KV cache / KV cache per token) |
+
+- This is the theoractical upper limit and doesn't matter if only has 1 request in baseline. We will compare multiple requests using vLLM.
+
+**Why L4, not T4 or A100**
+
+| GPU | Memory | Bandwidth | Verdict |
+|------------|-------|------------|-----|
+| T4 | 16 GB | 320GB/s | Can not use all 16GB + doesn't support bf16 |
+| L4 | 24 GB | 300 GB/s | Cheapest amoung all options fit the model |
+| A100 | 40 / 80 GB | 1.5-2TB/s | Faster, but more expensive as well |
+
+**Prediction**
+
+- The bottleneck of decode stage is on the memory bandwidth. For L4, the lower limit of TPOT is around weight size / memory bandwidth = 14GB/300GB ~ 4.6ms per token
+- We will check the actual number once we have results from the M3.
+
 ### Measurement caveats
 1. The number testing with Mac's CPU cannot be extrapolated to GPU's cases, as CPU's capacity is 120 GFLOPS where L4 is 121 TFLOPS (1,000x), and the bandwidth is 60 vs 300 GB/s (5x), so prefill (compute-bound) and decode (memory-bound) would speed up by very different factors.
 2. `TextIteratorStreamer` will output texts after the word finishes. It will affect short prompt by 20% since TTFT will take about 1 extra TPOT.
-3. Every function calling (model.generate) is only 3 runs per setting (median reported), on a single machine to.
+3. Every function calling (model.generate) is only 3 runs per setting (median reported), on a single machine.
 4. The +20% TPOT is unexplained (see M1.2).
