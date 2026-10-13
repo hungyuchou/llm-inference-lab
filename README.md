@@ -108,9 +108,9 @@ Model config from the Hugging Face
 
 | Item | Size | How I got it |
 |------------|-------|------------|
-| Weights | ~14GB | Number of Parameters (7.61B) × 2 bytes |
+| Weights | ~15.2GB | Number of Parameters (7.61B) × 2 bytes |
 | CUDA context / activations (reserved) | 1GB | Served as a buffer for activation |
-| Left for KV cache | 9 GB | 24 - 14 - 1 |
+| Left for KV cache | 7.8 GB | 24 - 15.2 - 1 |
 
 **KV cache per token**
 
@@ -127,8 +127,8 @@ Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
 
 | | Value |
 |------------|-------|
-| Max tokens in KV cache | ~157k (Left for KV cache / KV cache per token)|
-| Concurrent 2k-token requests | ~60-68 (Max tokens / 2048) |
+| Max tokens in KV cache | ~136k (Left for KV cache / KV cache per token = 7.8GB / 57,344 bytes)|
+| Concurrent 2k-token requests | ~66 (Max tokens / 2048) |
 
 - This is the theoretical upper limit and doesn't apply to the baseline, which serves one request at a time. We will compare multiple requests using vLLM.
 
@@ -136,13 +136,13 @@ Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
 
 | GPU | Memory | Bandwidth | Verdict |
 |------------|-------|------------|-----|
-| T4 | 16 GB | 320GB/s | Cannot use all 16GB (model weight is already 14GB) + doesn't support bf16 |
+| T4 | 16 GB | 320GB/s | Cannot use all 16GB (model weight is already 15.2GB) + doesn't support bf16 |
 | L4 | 24 GB | 300 GB/s | Cheapest among all options fit the model |
 | A100 | 40 / 80 GB | 1.5-2TB/s | Faster, but more expensive as well |
 
 **Prediction**
 
-- The bottleneck of decode stage is on the memory bandwidth. For L4, the lower limit of TPOT is around weight size / memory bandwidth = 14GB / 300GB/s ~ 46.7ms per token. In reality it will be much slower due to the cost from Hugging Face and activation.
+- The bottleneck of decode stage is on the memory bandwidth. For L4, the lower limit of TPOT is around weight size / memory bandwidth = 15.2GB / 300GB/s ~ 51ms per token. In reality it will be much slower due to the cost from Hugging Face and activation.
 - We will check the actual number once we have results from the M3.
 
 ### Measurement caveats
