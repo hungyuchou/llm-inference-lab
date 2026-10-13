@@ -117,6 +117,8 @@ Model config from the Hugging Face
 ```
 Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
         = 2 * 28 * 4 * 128 (3584/28) * 2
+        = 57,344 bytes
+        = 56 KB
 ```
 
 - The reason for having the 2 in the beginning is to consider K & V at the same time.
