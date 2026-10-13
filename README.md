@@ -70,7 +70,7 @@ Setting: Short prompt (11 tokens), 200 new tokens , greedy.
 
 Model: `Qwen2.5-7B-Instruct`, bf16. Numbers below are estimates by hand, to be verified in M2.4 / M3.
 
-Model config from the Huggingface
+Model config from the Hugging Face
 
 ```
 
@@ -116,6 +116,7 @@ Model config from the Huggingface
 
 ```
 Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
+        = 2 * 28 * 4 * 128 (3584/28) * 2
 ```
 
 - The reason for having the 2 in the beginning is to consider K & V at the same time.
@@ -126,22 +127,22 @@ Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
 
 | | Value |
 |------------|-------|
-| Max tokens in KV cache | ~140k |
-| Concurrent 2k-token requests | ~60-68 (Left for KV cache / KV cache per token) |
+| Max tokens in KV cache | ~157k (Left for KV cache / KV cache per token)|
+| Concurrent 2k-token requests | ~60-68 (Max tokens / 2048) |
 
-- This is the theoractical upper limit and doesn't matter if only has 1 request in baseline. We will compare multiple requests using vLLM.
+- This is the theoretical upper limit and doesn't apply to the baseline, which serves one request at a time. We will compare multiple requests using vLLM.
 
 **Why L4, not T4 or A100**
 
 | GPU | Memory | Bandwidth | Verdict |
 |------------|-------|------------|-----|
-| T4 | 16 GB | 320GB/s | Can not use all 16GB + doesn't support bf16 |
-| L4 | 24 GB | 300 GB/s | Cheapest amoung all options fit the model |
+| T4 | 16 GB | 320GB/s | Cannot use all 16GB (model weight is already 14GB) + doesn't support bf16 |
+| L4 | 24 GB | 300 GB/s | Cheapest among all options fit the model |
 | A100 | 40 / 80 GB | 1.5-2TB/s | Faster, but more expensive as well |
 
 **Prediction**
 
-- The bottleneck of decode stage is on the memory bandwidth. For L4, the lower limit of TPOT is around weight size / memory bandwidth = 14GB/300GB ~ 4.6ms per token
+- The bottleneck of decode stage is on the memory bandwidth. For L4, the lower limit of TPOT is around weight size / memory bandwidth = 14GB / 300GB/s ~ 46.7ms per token. In reality it will be much slower due to the cost from Hugging Face and activation.
 - We will check the actual number once we have results from the M3.
 
 ### Measurement caveats
