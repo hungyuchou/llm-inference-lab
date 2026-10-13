@@ -17,7 +17,7 @@ def download():
     from huggingface_hub import snapshot_download
 
     start = time.perf_counter()
-    snapshot_download(repo_id=MODEL_ID, local_dir=f"{MODEL_DIR}/{MODEL}/weights/")
+    snapshot_download(repo_id=MODEL_ID, local_dir=f"{MODEL_DIR}/{MODEL}/")
     elapsed = time.perf_counter() - start
 
     vol.commit()
