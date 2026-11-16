@@ -155,24 +155,22 @@ Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
 
 ### M2.2 — Model weights on Modal Volume
 
-Setup: (一句話：image 裝了什麼、volume 名字、掛在哪、檔案下載到哪)
-
-Created a image with the model weights. In this image we onyl install `huggingface_hub`. We also created a volume called `model-weights` under the container's path `/models`. After using `snapshot_download` to download the repo to `/models/Qwen2.5-7B-Instruct/`, which is falled under the volume. After `vol.coomit()`, the content is written to the volume
+Created an image that only installs huggingface_hub (no torch, since this step only downloads files). In this image we only install `huggingface_hub`. We also created a volume called `model-weights` under the container's path `/models`. `snapshot_download` downloads the whole repo to `/models/Qwen2.5-7B-Instruct/`. Since this path is under the volume’s mount point (/models), the files are written into the volume rather than the container’s temporary disk. After `vol.commit()`, the content is written to the volume
 
 Below are the stats of running `download_weights.py`:
 
 | Run | Time | What happened |
 |-----|------|---------------|
-| 1st | 75.8s | Download 14 files where the weight is 14.2 GB with ~200MB/s downloading speed. |
-| 2nd | 5.9s  | Got faster as the files are existed already. |
+| 1st | 75.8s | Download 14 files where the weight is 14.2 GiB (15.2 GB) with ~200MB/s downloading speed. |
+| 2nd | 5.9s  | Got faster as the files already exist. |
 
 Cost: $0.01 (CPU only). Timing covers `snapshot_download` only (not image build / container start).
 
 **Why not download from Hugging Face on every cold start?**
-It would be very time-consuming. Also, if Hugging Face is down, our service will also be affected as well.
+It would add ~76s to every cold start, on top of loading the weights onto the GPU. Also, if Hugging Face is down, our service would be affected.
 
 **Why put weights in a Volume instead of baking them into the image?**
-It's okay to put weights in the image. However, putting into the volume provides a flexibility of the possibility of changing the model. We would need to re-create the image everytime when we need to change the model.
+It's okay to put weights in the image. However, putting into the volume provides a flexibility of the possibility of changing the model. We would need to re-create the image every time when we need to change the model.
 
 
 **Why is the 2nd run 13x faster?**
