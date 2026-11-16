@@ -155,7 +155,7 @@ Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
 
 ### M2.2 — Model weights on Modal Volume
 
-Created an image that only installs huggingface_hub (no torch, since this step only downloads files). In this image we only install `huggingface_hub`. We also created a volume called `model-weights` under the container's path `/models`. `snapshot_download` downloads the whole repo to `/models/Qwen2.5-7B-Instruct/`. Since this path is under the volume’s mount point (/models), the files are written into the volume rather than the container’s temporary disk. After `vol.commit()`, the content is written to the volume
+Created an image that only installs `huggingface_hub` (no torch, since this step only downloads files). We also created a volume called `model-weights` under the container's path `/models`. `snapshot_download` downloads the whole repo to `/models/Qwen2.5-7B-Instruct/`. Since this path is under the volume’s mount point (/models), the files are written into the volume rather than the container’s temporary disk. After `vol.commit()`, the content is written to the volume.
 
 Below are the stats of running `download_weights.py`:
 
@@ -174,4 +174,4 @@ It's okay to put weights in the image. However, putting into the volume provides
 
 
 **Why is the 2nd run 13x faster?**
-Since the `snapshot_download` finds the required repo & files, it won't proceed to download the files from Hugging Face. Hence, the scripts runs faster.
+Since the `snapshot_download` finds the required repo & files, it won't proceed to download the files from Hugging Face. Hence, the script runs faster.
