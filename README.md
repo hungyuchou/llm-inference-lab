@@ -152,3 +152,28 @@ Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
 2. `TextIteratorStreamer` will output texts after the word finishes. It will affect short prompt by 20% since TTFT will take about 1 extra TPOT.
 3. Every function calling (model.generate) is only 3 runs per setting (median reported), on a single machine.
 4. The +20% TPOT is unexplained (see M1.2).
+
+### M2.2 — Model weights on Modal Volume
+
+Setup: (一句話：image 裝了什麼、volume 名字、掛在哪、檔案下載到哪)
+
+Created a image with the model weights. In this image we onyl install `huggingface_hub`. We also created a volume called `model-weights` under the container's path `/models`. After using `snapshot_download` to download the repo to `/models/Qwen2.5-7B-Instruct/`, which is falled under the volume. After `vol.coomit()`, the content is written to the volume
+
+Below are the stats of running `download_weights.py`:
+
+| Run | Time | What happened |
+|-----|------|---------------|
+| 1st | 75.8s | Download 14 files where the weight is 14.2 GB with ~200MB/s downloading speed. |
+| 2nd | 5.9s  | Got faster as the files are existed already. |
+
+Cost: $0.01 (CPU only). Timing covers `snapshot_download` only (not image build / container start).
+
+**Why not download from Hugging Face on every cold start?**
+It would be very time-consuming. Also, if Hugging Face is down, our service will also be affected as well.
+
+**Why put weights in a Volume instead of baking them into the image?**
+It's okay to put weights in the image. However, putting into the volume provides a flexibility of the possibility of changing the model. We would need to re-create the image everytime when we need to change the model.
+
+
+**Why is the 2nd run 13x faster?**
+Since the `snapshot_download` finds the required repo & files, it won't proceed to download the files from Hugging Face. Hence, the scripts runs faster.
