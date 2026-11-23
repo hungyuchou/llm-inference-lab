@@ -18,20 +18,24 @@ class Model:
     @modal.enter()
     def loading_model(self):
 
+        start = time.perf_counter()
         import torch
+        import_torch = time.perf_counter()
+        self.torch_elapsed = import_torch - start
         from transformers import AutoTokenizer, AutoModelForCausalLM
-        
+        import_transformer = time.perf_counter()
+        self.transformer_elapsed = import_transformer - import_torch
         # checkpoint = "Qwen/Qwen2.5-0.5B-Instruct"
 
         loading_start = time.perf_counter()
         self.model = AutoModelForCausalLM.from_pretrained(f"{MODEL_DIR}/{MODEL}", dtype=torch.bfloat16, device_map="cuda")
         loading_elapsed = time.perf_counter() - loading_start
-
+        self.loading_elapsed = loading_elapsed
         self.tokenizer = AutoTokenizer.from_pretrained(f"{MODEL_DIR}/{MODEL}")
         
         print(f"Loading in {loading_elapsed:.1f}s")
 
-    @modal.fastapi_endpoint(method="POST")
+    @modal.fastapi_endpoint(method="POST", requires_proxy_auth=True)
     def generate(self, req: dict):
 
         prompt = req['prompt']
