@@ -19,6 +19,7 @@ class Model:
     @modal.enter()
     def loading_model(self):
 
+        self.enter_wall = time.time()
         start = time.perf_counter()
         import torch
         import_torch = time.perf_counter()
@@ -33,6 +34,7 @@ class Model:
         loading_elapsed = time.perf_counter() - loading_start
         self.loading_elapsed = loading_elapsed
         self.tokenizer = AutoTokenizer.from_pretrained(f"{MODEL_DIR}/{MODEL}")
+        self.first_request = True
         
         print(f"Loading in {loading_elapsed:.1f}s")
 
@@ -53,8 +55,9 @@ class Model:
         generated_tokens = len(generation_outputs[0][token_length:])
 
         print(f"Generate in {generate_elapsed:.1f}s. Avg {generated_tokens/generate_elapsed} token/s")
-        
-        
+
+        is_cold = self.first_request
+        self.first_request = False
 
         return {'prompt': prompt, 
                 'response': self.tokenizer.decode(generation_outputs[0][token_length:], skip_special_tokens=True),
@@ -65,4 +68,6 @@ class Model:
                 'torch_elapsed': self.torch_elapsed,
                 'transformer_elapsed': self.transformer_elapsed,
                 'loading_elapsed': self.loading_elapsed,
+                'enter_wall': self.enter_wall,
+                'cold_start': is_cold
                 }
