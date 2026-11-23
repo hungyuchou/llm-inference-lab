@@ -223,3 +223,37 @@ Cost: 0.03 USD on L4 GPU
 - There is a queuing time for 7 mins for getting GPU from Modal.
 - Test 3 requests (excluding the warm-ups)
 - Queue time is not billed.
+
+
+### M2.4 — Cold start breakdown
+
+Setup: Switched from `modal serve` to `modal deploy` with proxy auth. Pinned versions (torch 2.15.0, transformers 5.23.0, accelerate 1.15.0, fastapi 0.163.1).
+
+How I measured: Recorded `time.time()` on the client before sending and at the first line of `@modal.enter` on the server; stage ① = server time − client time. Import and weight loading are timed with `perf_counter`.
+
+| Stage | Time | Share |
+|-------|------|-------|
+| ① Queue for GPU + container start | 575.7 s | 96.6% |
+| ② Import torch + transformers | 4.7 s | 0.8% |
+| ③ Load weights (volume → GPU) | 9.4 s | 1.6% |
+| ④ First request* (incl. generate 5.05 s) | 6.1 s | 1.0% |
+| **Total (client)** | **595.9 s** | |
+
+\* Not part of cold start — a warm request takes ~5.2 s too.
+
+**Cold-start penalty = cold total − warm total ≈ 595.9 − 5.2 ≈ 590.7 s**
+
+**Findings**
+- Queuing takes 96.6% of the cold start. Excluding the queue: import (4.7 s) + weights (9.4 s) + extra time of the first generate (~0.8 s) ≈ 15 s, plus container start (2–12 s, estimated by polling) → roughly 17–27 s.
+- Queue time varies a lot: ~7 min in M2.3 vs ~9.6 min in this run. GPU availability on Modal is the largest and least controllable factor.
+- The first generate is ~0.8 s slower than warm ones (5.05 s vs 4.23 s; 14.3 vs 17.0 tok/s). Hypothesis: one-time GPU initialization on the first run (CUDA context setup, kernel loading) — not verified.
+- Warm requests match M2.3 (4.23 s, 17.0 tok/s vs 4.22 s, 17.04 tok/s), so the baseline is stable and reproducible after pinning versions and switching to `modal deploy`.
+
+**Trade-off: how to reduce cold start**
+- `min_containers=1` keeps one container always running, so no queue and no cold start — but the L4 is billed 24/7 (~$0.80/h → ~$580/month).
+- `scaledown_window`: longer → fewer cold starts but more idle cost; shorter → cheaper but more cold starts. Currently 180 s, and it works as expected (the container scaled to zero ~3 min after the last request).
+- Only ② + ③ (~14 s) can be optimized in code; the queue (①) can only be traded for money (`min_containers`) or a more available GPU type.
+
+**Caveats**
+- There is no time measurement for loading the tokenizer, which is included in ④ (request time).
+- Clock skew between Mac and Modal.
