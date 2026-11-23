@@ -27,7 +27,7 @@ The results below are using `Qwen2.5-0.5B-Instruct` model.
 
 - What I learned through the process: 
 1. The Instruct model is using ChatML format for SFT, where "answering after the assistant tag" is the pattern it learned during the training phase.
-2. The responses might be different when calling the `model.generate` function since the config is using (word) sampling by default. When doing the experiment, using `do_sample=False` for fair comparison.
+2. The responses might be different when calling the `model.generate` function since the config is using (word) sampling by default. When doing the experiment, using `do_sample=False (greedy)` for fair comparison.
 
 ### M1.2 — TTFT vs TPOT
 
@@ -175,3 +175,51 @@ It's okay to put weights in the image. However, putting into the volume provides
 
 **Why is the 2nd run 13x faster?**
 Since the `snapshot_download` finds the required repo & files, it won't proceed to download the files from Hugging Face. Hence, the script runs faster.
+
+
+### M2.3 — Baseline `/generate` endpoint on L4
+
+Setup: Create an /generate endpoint on L4 GPU for baseline benchmarking. The model weights are loaded from the Modal volume which is downloaded from previous `download_weights.py`.
+Baseline on purpose: The max_containers parameter is set to 1 with no optimization for the baseline comparison.
+
+**Results** 
+Test config: 
+- prompt: "Explain KV cache in 3 sentences."
+- max_tokens=100
+
+| Metric | Value |
+|--------|-------|
+| Model loading (volume → GPU) | 12 s |
+| Input / output tokens | 38 / 72 |
+| Generate time (server) | 4.22 s |
+| Throughput | 17.04 tokens/s |
+| TPOT |  58.7 ms |
+
+**Latency breakdown (warm request)**
+
+| Layer | Time | What's added at this layer |
+|-------|------|----------------------------|
+| `model.generate` | 4.22s | GPU compute: prefill (38 tokens) + 71 decode steps |
+| Modal execution | 4.4s | + tokenization & decode |
+| Modal duration | 4.51s | + internal transfer within Modal |
+| Client (`curl` total) | 5.36s | + Singapore ↔ us-east round trip, TLS handshake, Modal web proxy |
+
+**TPOT vs M2.1 prediction**
+
+The predicted TPOT in M2.1 is 51ms, whereas the actual TPOT in the real measurement is 58.7ms. Based on this number, it uses 86% of L4 bandwidth. (15.2 GB of Model weight / 0.0587s = 259GB/s, which is roughly 86% of L4 bandwidth of 300 GB/s.)
+
+**Why record server-side and client-side time separately?**
+Client time is ~19% higher than Modal duration (5.36s vs 4.51s). If only measuring the client time, user would overestimate the model's latency. However, optimizations for the model only change the server part. So the server time, Modal duration, is the one to compare across the milestone.
+
+**Observations**
+- The first 3 requests (from earlier timed-out attempts) were slower (8–9.6 tokens/s), likely warmup.
+- The output stopped at 72 tokens though the upper limit is 100. The model stops early since output the EOS.
+- The 3 responses were identical since `do_sample` is set to `False` for the reproducible result.
+- The response from the model for the KV cache is wrong though, likely because the prompt is ambiguous (KV cache is also a database term)
+
+Cost: 0.03 USD on L4 GPU
+
+**Caveats**
+- There is a queuing time for 7 mins for getting GPU from Modal.
+- Test 3 requests (excluding the warm-ups)
+- Queue time is not billed.
