@@ -2,8 +2,7 @@ import time
 import modal
 
 image = modal.Image.debian_slim()\
-             .pip_install("torch==2.15.0", "transformers==5.23.0",
-                          "accelerate==1.15.0", "fastapi[standard]==0.163.1")
+             .pip_install("huggingface_hub")
 
 app = modal.App(image=image, name="download-weights")
 
