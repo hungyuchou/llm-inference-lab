@@ -144,7 +144,7 @@ Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
 
 **Prediction**
 
-- The bottleneck of decode stage is on the memory bandwidth. For L4, the lower limit of TPOT is around weight size / memory bandwidth = 15.2GB / 300GB/s ~ 51ms per token. In reality it will be much slower due to the cost from Hugging Face and activation.
+- The bottleneck of decode stage is on the memory bandwidth. For L4, the lower limit of TPOT is around weight size / memory bandwidth = 15.2GB / 300GB/s ~ 51ms per token. In reality it will be much slower (by 15% after testing in M2.4, which is 58.7ms) due to the cost from Hugging Face and activation. 
 - We will check the actual number once we have results from the M3.
 
 ### Measurement caveats
@@ -250,7 +250,7 @@ How I measured: Recorded `time.time()` on the client before sending and at the f
 - Warm requests match M2.3 (4.23 s, 17.0 tok/s vs 4.22 s, 17.04 tok/s), so the baseline is stable and reproducible after pinning versions and switching to `modal deploy`.
 
 **Trade-off: how to reduce cold start**
-- `min_containers=1` keeps one container always running, so no queue and no cold start — but the L4 is billed 24/7 (~$0.80/h → ~$580/month).
+- `min_containers=1` keeps one container always running, so no queue and no cold start — but the L4 is billed 24/7 (~$0.80/h → ~$575/month).
 - `scaledown_window`: longer → fewer cold starts but more idle cost; shorter → cheaper but more cold starts. Currently 180 s, and it works as expected (the container scaled to zero ~3 min after the last request).
 - Only ② + ③ (~14 s) can be optimized in code; the queue (①) can only be traded for money (`min_containers`) or a more available GPU type.
 
