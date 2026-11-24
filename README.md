@@ -144,7 +144,7 @@ Formula = 2 * num of hidden layer * num_key_value_heads * head_dim * bytes
 
 **Prediction**
 
-- The bottleneck of decode stage is on the memory bandwidth. For L4, the lower limit of TPOT is around weight size / memory bandwidth = 15.2GB / 300GB/s ~ 51ms per token. In reality it will be much slower (by 15% after testing in M2.4, which is 58.7ms) due to the cost from Hugging Face and activation. 
+- The bottleneck of decode stage is on the memory bandwidth. For L4, the lower limit of TPOT is around weight size / memory bandwidth = 15.2GB / 300GB/s ~ 51ms per token. In reality it will be much slower (by 15% after testing in M2.3, which is 58.7ms) due to the cost from Hugging Face and activation. 
 - We will check the actual number once we have results from the M3.
 
 ### Measurement caveats
