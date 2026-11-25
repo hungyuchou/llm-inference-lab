@@ -35,7 +35,7 @@ async def send_one(client, url, prompt_row, max_tokens, sem):
                     'error': resp.text
                 }
             
-            print('Cold start flag for prompt ID ', prompt_row['id'], ':', resp.json().get('cold_start', 'N/A'))
+            print('Cold start flag for prompt ID ', prompt_row['id'], ':', resp.json().get('cold_start', 'N/A'), 'Output tokens: ', resp.json().get('output_tokens', 'N/A'))
 
             return {
                 'id': prompt_row['id'],
@@ -61,7 +61,7 @@ async def run(url, prompts, concurrency, max_tokens):
     async with httpx.AsyncClient(headers={"MODAL-KEY": MODAL_KEY, "MODAL-SECRET": MODAL_SECRET}, follow_redirects=True, timeout=300) as client:
 
         warmup_result = await send_one(client, url, prompts[0], max_tokens, asyncio.Semaphore(concurrency))
-        print('Warmup request\'s Status: ', warmup_result['status'], 'Cold Start: ', warmup_result.get('cold_start', 'N/A'))
+        print('Warmup request\'s Status: ', warmup_result['status'], 'Cold Start: ', warmup_result.get('cold_start', 'N/A'), 'Output tokens: ', warmup_result.get('output_tokens', 'N/A'))
 
         sem = asyncio.Semaphore(concurrency)
         wall_start = time.perf_counter()
