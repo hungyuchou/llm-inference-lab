@@ -1,4 +1,4 @@
-import argparse, asyncio, json, os, time
+import argparse, asyncio, json, os, time, statistics
 import httpx
 
 def load_prompts(path):
@@ -43,6 +43,7 @@ async def send_one(client, url, prompt_row, max_tokens, sem):
                 'status': resp.status_code,
                 'latency': latency,
                 **resp.json()}
+        
         except httpx.HTTPError as e:
             print(f"HTTP error for prompt ID {prompt_row['id']}: {e}")
             return {
@@ -70,6 +71,50 @@ async def run(url, prompts, concurrency, max_tokens):
 
     return results, wall
 
+def save_results(path, meta, metrics, results):
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    with open(path, 'w') as f:
+        json.dump({"meta": meta, "metrics": metrics, "results": results}, f, indent=4)
+
+
+def compute_metrics(results, wall):
+
+    updated_results = [x for x in results if x['status'] == 200]
+    
+    #latency
+    lat = sorted(x['latency'] for x in updated_results)
+
+    mean_latency = sum(x['latency'] for x in updated_results) / len(updated_results) if updated_results else None
+    p99_latency = statistics.quantiles(lat, n=100, method='inclusive')[98] if len(lat) >= 2 else (lat[0] if lat else None)
+    p50_latency = statistics.median(lat) if lat else None
+    max_latency = max(x['latency'] for x in updated_results) if updated_results else None
+
+    request_per_second = len(updated_results) / wall if wall > 0 else None
+    output_tokens_per_second = sum(x.get('output_tokens', 0) for x in updated_results) / wall if wall > 0 else None
+
+    speeds = [x['output_tokens'] / x['generate_elapsed'] for x in updated_results if x.get('output_tokens') and x.get('generate_elapsed')]
+
+    decode_tokens_per_second = sum(speeds) / len(speeds) if speeds else None
+
+    TTFT = None
+
+    return {
+
+        'mean_latency': mean_latency,
+        'p99_latency': p99_latency,
+        'p50_latency': p50_latency,
+        'max_latency': max_latency,
+        'request_per_second': request_per_second,
+        'output_tokens_per_second': output_tokens_per_second,
+        'decode_tokens_per_second': decode_tokens_per_second,
+        'TTFT': TTFT
+    } 
+
+def fmt(v):
+    return f"{v:.2f}" if isinstance(v, (int, float)) else "N/A"
+
 def main():
 
     parser = argparse.ArgumentParser(prog='llm_inference_benchmark', description='To benchmark the LLM inference service')
@@ -77,22 +122,31 @@ def main():
 
     parser.add_argument('--url')  
     parser.add_argument('--concurrency', type=int, required=True)
-    parser.add_argument('--max-tokens', default=128)
+    parser.add_argument('--max-tokens', default=128, type=int)
     parser.add_argument('--prompts', default='benchmark/prompts.jsonl')
+    parser.add_argument('--tag', default='baseline')
 
     args = parser.parse_args()
 
     prompts = load_prompts(args.prompts)
-    results, wall = asyncio.run(run(args.url, prompts, int(args.concurrency), int(args.max_tokens)))
-    
-    request_per_second = len(results) / wall
+    results, wall = asyncio.run(run(args.url, prompts, args.concurrency, args.max_tokens))
+
+    metrics = compute_metrics(results, wall)
+    meta = {"tag": args.tag, "concurrency": args.concurrency, "max_tokens": args.max_tokens}
+    path = f"benchmark/results/{args.tag}_c{args.concurrency}_{time.strftime('%Y%m%d-%H%M%S')}.json"
+
+    save_results(path, meta, metrics, results)
 
     response = f"""
     
     =============================================
-    Total wall time: {wall:.2f} seconds
+    Total wall time: {fmt(wall)} seconds
     Total requests: {len(results)}
-    Request per second: {request_per_second:.2f}
+    Request per second: {fmt(metrics['request_per_second'])}
+    P50 / P99 latency: {fmt(metrics['p50_latency'])} / {fmt(metrics['p99_latency'])}s
+    Output tokens/s: {fmt(metrics['output_tokens_per_second'])}
+    Decode tokens/s: {fmt(metrics['decode_tokens_per_second'])}
+    TTFT: {fmt(metrics['TTFT'])}
     =============================================
     
     Stats for each request:
@@ -100,7 +154,7 @@ def main():
     """
 
     for result in results:
-        response += f"ID: {result['id']}, Status: {result['status']}, Latency: {result.get('latency', -1):.2f}s, Generate elapsed: {result.get('generate_elapsed', -1):.2f}s\n"
+        response += f"ID: {result['id']}, Status: {result['status']}, Latency: {fmt(result.get('latency', -1))}s, Generate elapsed: {fmt(result.get('generate_elapsed', -1))}s\n"
 
     print(response)
 
